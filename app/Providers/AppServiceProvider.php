@@ -28,14 +28,13 @@ class AppServiceProvider extends ServiceProvider
         Model::preventSilentlyDiscardingAttributes(!app()->isProduction());
 
         if (app()->isProduction()) {
-            dispatch(function () {
-                DB::whenQueryingForLongerThan(500, function (Connection $connection) {
+            DB::whenQueryingForLongerThan(500, function (Connection $connection) {
+                dispatch(function () use ($connection) {
                     logger()
                         ->channel('telegram')
                         ->debug('whenQueryingForLongerThan:500' . $connection->totalQueryDuration());
                 });
             });
-
 
             DB::listen(function ($query) {
                 if ($query->time > 500) {
@@ -50,9 +49,13 @@ class AppServiceProvider extends ServiceProvider
             $app->whenRequestLifecycleIsLongerThan(
                 CarbonInterval::seconds(4),
                 function () {
-                    logger()
-                        ->channel('telegram')
-                        ->debug('whenRequestLifecycleIsLongerThan 4 seconds' . request()->url());
+                    DB::whenQueryingForLongerThan(500, function (Connection $connection) {
+                        dispatch(function () {
+                            logger()
+                                ->channel('telegram')
+                                ->debug('whenRequestLifecycleIsLongerThan 4 seconds' . request()->url());
+                        });
+                    });
                 }
             );
         }
