@@ -27,21 +27,34 @@ class AppServiceProvider extends ServiceProvider
         Model::preventLazyLoading(!app()->isProduction());
         Model::preventSilentlyDiscardingAttributes(!app()->isProduction());
 
-        DB::whenQueryingForLongerThan(500, function (Connection $connection) {
-            logger()
-                ->channel('telegram')
-                ->debug('whenQueryingForLongerThan:500' . $connection->query()->toSql());
-        });
+        if (app()->isProduction()) {
+            dispatch(function () {
+                DB::whenQueryingForLongerThan(500, function (Connection $connection) {
+                    logger()
+                        ->channel('telegram')
+                        ->debug('whenQueryingForLongerThan:500' . $connection->totalQueryDuration());
+                });
+            });
 
-        $app = app(Kernel::class);
 
-        $app->whenRequestLifecycleIsLongerThan(
-            CarbonInterval::seconds(4),
-            function () {
-                logger()
-                    ->channel('telegram')
-                    ->debug('whenRequestLifecycleIsLongerThan 4 seconds' . request()->url());
-            }
-        );
+            DB::listen(function ($query) {
+                if ($query->time > 500) {
+                    logger()
+                        ->channel('telegram')
+                        ->debug('whenQueryingForLongerThan:500' . $query->toSql());
+                }
+            });
+
+            $app = app(Kernel::class);
+
+            $app->whenRequestLifecycleIsLongerThan(
+                CarbonInterval::seconds(4),
+                function () {
+                    logger()
+                        ->channel('telegram')
+                        ->debug('whenRequestLifecycleIsLongerThan 4 seconds' . request()->url());
+                }
+            );
+        }
     }
 }
